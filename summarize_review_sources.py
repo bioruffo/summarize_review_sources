@@ -6,6 +6,7 @@ Created on Sat Apr  3 23:00:46 2021
 """
 import glob
 import re
+import csv
 
 class Paper:
     def __init__(self, datadict):
@@ -66,10 +67,25 @@ class Papers:
 
         papno = 0
         outcomes = {'new': 0, 'updated': 0}
-        for i, line in enumerate(open(file, 'r', encoding='latin1')):
-            line = line.strip().split('\t')
+        # encoding for pubmed is 'utf-8-sig', the first 3 chars are the byte order mark 'ï»¿'
+        #we need to check if separator is ',' or ';'
+        with open(file, 'r', encoding='utf-8-sig') as f:
+            line = f.readline()
+            if ';' in line:
+                sep = ';'
+            elif ',' in line:
+                sep=','
+            else:
+                sep='\t'
+        reader = csv.reader(open(file, 'r', encoding='utf-8-sig'), delimiter=sep, quotechar='"')
+        for i, line in enumerate(reader):
             if i == 0:
                 header = line.copy()
+                '''
+                # bad removal of the byte order mark
+                if header[0].startswith('ï»¿'):
+                    header[0] = header[0][3:]
+                '''
             else:
                 data = {header[j]: line[j] for j in range(len(line))}
                 data['Source'] = source
@@ -129,9 +145,16 @@ def oror(start, end):
 
 if __name__ == '__main__':
     maindir = 'C:/Users/Roberto/Dropbox/Quarentena/CACD/Review/Searches/'
+    capture = '_PARSE'
+    diffdir = '4_NOVO'
+    papers = Papers(glob.glob(maindir+diffdir+'/**/*'+capture+'.csv', recursive=True))
+    papers.export(diffdir+'.tsv')
+    
 
+
+'''
     diffdir = '1_igual_ao_artigo'
-    papers = Papers(glob.glob(maindir+diffdir+'/**/*.tsv', recursive=True))
+    papers = Papers(glob.glob(maindir+diffdir+'/**/*_parsethis.tsv', recursive=True))
     papers.export(diffdir+'.tsv')
     igual = papers
 
@@ -153,3 +176,12 @@ if __name__ == '__main__':
             core += 1
     print('core:', core)
     mais.export('compara_c_base.tsv')
+'''
+
+'''
+import pandas
+novoall = pandas.DataFrame.from_csv('4_NOVO_all.tsv', sep='\t')
+novotak = pandas.DataFrame.from_csv('4_NOVO_tak.tsv', sep='\t')
+diff = novoall[~novoall['hash'].isin(novotak['hash'])]
+diff.to_csv("diff.tsv", sep="\t")
+'''
