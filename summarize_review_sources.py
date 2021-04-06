@@ -57,14 +57,21 @@ class Paper:
                        'Citation': 'Source' # Pubmed
                        }
         
-        value_conversions = {'Authors': lambda x: x.replace('.', ''),
-                             'Title': lambda x:x.lower(),
-                             'DOI': lambda x:x.lower()}
         
         # Need to switch from 'Source' to 'Database' in Scopus
         if datadict.get('Source', '').lower() == 'scopus':
             datadict['Database'] = datadict.pop('Source')
-        
+            
+        # Normalize DOI in Lilacs
+        if datadict.get('Fulltext URL', False) and not datadict.get('DOI', False):
+            doiloc = datadict['Fulltext URL'].find('doi.org')
+            if doiloc != -1:
+               datadict['DOI'] = datadict['Fulltext URL'][doiloc+8:]
+
+        value_conversions = {'Authors': lambda x: x.replace('.', ''),
+                             'Title': lambda x:x.lower(),
+                             'DOI': lambda x:x.lower()}
+
         datadict = {key_conversions.get(item, item): datadict[item] for item in datadict}
         datadict = {key: value_conversions.get(key, lambda x: x)(value) for key, value in datadict.items()}
         if 'First Author' not in datadict.keys():
@@ -108,11 +115,6 @@ class Papers:
         for i, line in enumerate(reader):
             if i == 0:
                 header = line.copy()
-                '''
-                # bad removal of the byte order mark
-                if header[0].startswith('ï»¿'):
-                    header[0] = header[0][3:]
-                '''
             else:
                 # Catch the Lilacs "bug" where there's an unescaped comma
                 if len(line) == len(header) + 1 and "LILACS" in line:
@@ -125,13 +127,6 @@ class Papers:
                 paper = Paper(data)
                 papno += 1
                 outcome = self.update(paper)
-
-                if paper.data['hash'] == 'joshmullsmal1997':
-                    print(paper.data)
-                    for key, value in self.ids.items():
-                        if value == paper:
-                            print(key)
-
                 outcomes[outcome] += 1
         print('Read {} papers, {} new, {} updated'.format(papno, outcomes['new'], outcomes['updated']))
         
@@ -139,11 +134,15 @@ class Papers:
     def update(self, paper):
         outcome = 'updated'
         stored_ident = []
+        # Check if we already have this paper
         for ident in ['DOI', 'PMID', 'hash']:
             if paper.data.get(ident, False) and paper.data[ident] in self.ids:
                 stored_ident.append(self.ids[paper.data[ident]])
+        # New data shoouldn't conflict with previous data
         if stored_ident != []:
             assert all(x is stored_ident[0] for x in stored_ident)
+            assert all(stored_ident[0].get(z, None) in ['', paper.data.get(z, None)] \
+                       for z in ['DOI', 'PMID', 'hash'])
             stored_ident[0].add(paper.data)
             paper = stored_ident[0]
         else:
@@ -158,8 +157,8 @@ class Papers:
     
     def export(self, filename):
         print('Exporting to:', filename)
-        fields = ['DOI', 'PMID', 'hash', 'Title', 'Authors', 'Source title', 'Year', 'Full Text Link', \
-                  'Database',  'database_file', 'info']
+        fields = ['DOI', 'PMID', 'hash', 'database_file', 'Title', 'Authors', \
+                  'Source', 'Language', 'Abstract', 'Year', 'Database', 'info']
         lines = []
         for paper in sorted(self.papers, key = lambda x: x.data['hash']):
             data = [paper.data.get(field, '') for field in fields]
