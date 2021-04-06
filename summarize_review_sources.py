@@ -25,21 +25,53 @@ class Paper:
         
     def convert(self, datadict):
         key_conversions = {
-                       'Publication Year': 'Year',
-                       'Medline PMID': 'PMID',
-                       'Author Names': 'Authors',
-                       'Article Title': 'Title',
-                       'Pubmed Id': 'PMID',
-                       'Journal/Book': 'Source title',
-                       'Source Title': 'Source title'}
+                       'Abbreviated Source Title': 'Journal Abbreviation', # Scopus
+                       'Art. No.': 'Article Number', # Scopus
+                       'Addresses': 'Author Addresses', # WoS
+                       'Author Names': 'Authors', # Embase
+                       'Conference Name': 'Conference Title', # Embase
+                       'Publication Date': 'Date of Publication', # WoS
+                       'Create Date': 'Entry Date', # Pubmed
+                       'Full Record Entry Date': 'Entry Date', # Embase
+                       'Page start': 'First Page', # Scopus
+                       'Start Page': 'First Page', # WoS
+                       'Fulltext URL': 'Full Text Link', # Lilacs
+                       'Issue number': 'Issue', # Lilacs
+                       'Journal/Book': 'Journal', # Pubmed
+                       'Source title': 'Journal', # Embase, Scopus
+                       'Source Title': 'Journal', # WoS
+                       'Abbreviated Source Title': 'Journal Abbreviation', # Scopus
+                       'Article Language': 'Language', # Embase
+                       'Language of Original Document': 'Language', # Scopus
+                       'Page end': 'Last Page', # Lilacs
+                       'End Page': 'Last Page', # WoS
+                       'Number of Pages': 'Page count', # WoS
+                       'Medline PMID': 'PMID', # Embase
+                       'PubMed ID': 'PMID', # Scopus
+                       'Pubmed Id': 'PMID', # WoS
+                       'Type': 'Publication Type', # Lilacs
+                       'Article Title': 'Title', # WoS
+                       'Volume number': 'Volume', # Lilacs
+                       'Publication Year': 'Year', # Embase, WoS,
+                       'Publication year': 'Year', # Lilacs
+                       'Citation': 'Source' # Pubmed
+                       }
+        
         value_conversions = {'Authors': lambda x: x.replace('.', ''),
                              'Title': lambda x:x.lower(),
                              'DOI': lambda x:x.lower()}
+        
+        # Need to switch from 'Source' to 'Database' in Scopus
+        if datadict.get('Source', '').lower() == 'scopus':
+            datadict['Database'] = datadict.pop('Source')
+        
         datadict = {key_conversions.get(item, item): datadict[item] for item in datadict}
         datadict = {key: value_conversions.get(key, lambda x: x)(value) for key, value in datadict.items()}
         if 'First Author' not in datadict.keys():
             datadict['First Author'] = datadict['Authors'].split(',')[0]
         datadict['hash'] = do_hash(datadict['Authors'], datadict['Title'], datadict['Year'])
+        if 'Database' not in datadict.keys():
+            datadict['Database'] = shorten_source(datadict['database_file'])
         datadict['info'] = ''
         return datadict
     
@@ -82,8 +114,14 @@ class Papers:
                     header[0] = header[0][3:]
                 '''
             else:
-                data = {header[j]: line[j] for j in range(len(line))}
-                data['Source'] = source
+                # Catch the Lilacs "bug" where there's an unescaped comma
+                if len(line) == len(header) + 1 and "LILACS" in line:
+                    line[-2] = line[-2] + line[-1]
+                    line.pop()
+                else:
+                    data = {header[j]: line[j] for j in range(len(line))}
+                
+                data['database_file'] = source
                 paper = Paper(data)
                 papno += 1
                 outcome = self.update(paper)
@@ -118,15 +156,13 @@ class Papers:
             
     
     
-    def export(self, filename, shortensource=False):
+    def export(self, filename):
         print('Exporting to:', filename)
         fields = ['DOI', 'PMID', 'hash', 'Title', 'Authors', 'Source title', 'Year', 'Full Text Link', \
-                  'Source',  'info']
+                  'Database',  'database_file', 'info']
         lines = []
         for paper in sorted(self.papers, key = lambda x: x.data['hash']):
             data = [paper.data.get(field, '') for field in fields]
-            if shortensource:
-                data[fields.index('Source')] = shorten_source(data[fields.index('Source')])
             lines.append(data)
         with open(filename, 'w', encoding='utf8') as f:
             f.write('\t'.join(fields)+'\n')
@@ -172,7 +208,7 @@ if __name__ == '__main__':
     capture = '_PARSE'
     diffdir = '4_NOVO'
     papers = Papers(glob.glob(maindir+diffdir+'/**/*'+capture+'.csv', recursive=True))
-    papers.export(diffdir+'.tsv', shortensource=True)
+    papers.export(diffdir+'.tsv')
 
     
     '''
