@@ -4,6 +4,7 @@ Created on Sat Apr  3 23:00:46 2021
 
 @author: Roberto
 """
+import pandas as pd
 import glob
 import re
 import csv
@@ -38,17 +39,11 @@ class Paper:
         datadict = {key: value_conversions.get(key, lambda x: x)(value) for key, value in datadict.items()}
         if 'First Author' not in datadict.keys():
             datadict['First Author'] = datadict['Authors'].split(',')[0]
-        datadict['hash'] = self.do_hash(datadict['Authors'], datadict['Title'], datadict['Year'])
+        datadict['hash'] = do_hash(datadict['Authors'], datadict['Title'], datadict['Year'])
         datadict['info'] = ''
         return datadict
     
-    def do_hash(self, authors, title, year):
-        ausplit = re.split('[;,]', authors.replace('.', '.'))
-        aujoin = ''.join(x.strip().split(' ')[0][:3].lower() for x in ausplit)
-        tisplit = re.sub('[^a-z ]', '', title).split(' ') # we set all to lowercase earlier
-        tijoin = ''.join(x.strip()[:3] for x in tisplit)
-        return year+aujoin+tijoin
-        
+       
     def __repr__(self):
         return self.data['First Author']+','+self.data['Year']
 
@@ -123,14 +118,16 @@ class Papers:
             
     
     
-    def export(self, filename):
+    def export(self, filename, shortensource=False):
         print('Exporting to:', filename)
         fields = ['DOI', 'PMID', 'hash', 'Title', 'Authors', 'Source title', 'Year', 'Full Text Link', \
                   'Source',  'info']
         lines = []
         for paper in sorted(self.papers, key = lambda x: x.data['hash']):
-            lines.append([paper.data.get(field, '') for field in fields])
-        lines = sorted(lines)
+            data = [paper.data.get(field, '') for field in fields]
+            if shortensource:
+                data[fields.index('Source')] = shorten_source(data[fields.index('Source')])
+            lines.append(data)
         with open(filename, 'w', encoding='utf8') as f:
             f.write('\t'.join(fields)+'\n')
             for line in lines:
@@ -138,9 +135,36 @@ class Papers:
         print('Exported', len(lines), 'papers')
 
 
+
 # helper functions
 def oror(start, end):
     print(" OR ".join("#"+str(x) for x in range(start, end+1)))
+
+
+def do_hash(authors, title, year):
+    # from `Lastname, FN;` to `Lastname FN,` 
+    if ';' in authors:
+        authors = authors.replace(',', ' ').replace(';', ',')
+    ausplit = [x.strip() for x in authors.split(',')]
+    aujoin = ''.join(x.strip().split(' ')[0][:3].lower() for x in ausplit)
+    tisplit = re.sub('[^a-z ]', '', title).split(' ') # we set all to lowercase earlier
+    tijoin = ''.join(x.strip()[:3] for x in tisplit)
+    return year+aujoin+tijoin
+
+
+def shorten_source(string):
+    strlow = string.lower()
+    if 'pubmed' in strlow:
+        return 'Pubmed'
+    elif 'embase' in strlow:
+        return 'Embase'
+    elif 'scopus' in strlow:
+        return 'Scopus'
+    elif 'wos' in strlow or 'web_of_science' in strlow or 'webofscience' in strlow:
+        return 'WoS'
+    else:
+        return string
+
 
 
 if __name__ == '__main__':
@@ -148,40 +172,23 @@ if __name__ == '__main__':
     capture = '_PARSE'
     diffdir = '4_NOVO'
     papers = Papers(glob.glob(maindir+diffdir+'/**/*'+capture+'.csv', recursive=True))
-    papers.export(diffdir+'.tsv')
-    
-
-
-'''
-    diffdir = '1_igual_ao_artigo'
-    papers = Papers(glob.glob(maindir+diffdir+'/**/*_parsethis.tsv', recursive=True))
-    papers.export(diffdir+'.tsv')
-    igual = papers
-
-    diffdir = '2_um_pouco_mais'
-    papers = Papers(glob.glob(maindir+diffdir+'/**/*.tsv', recursive=True))
-    papers.export(diffdir+'.tsv')
-    mais = papers
+    papers.export(diffdir+'.tsv', shortensource=True)
 
     
+    '''
+    novoall = pd.read_csv('4_NOVO_all.tsv', sep='\t')
+    novotak = pd.read_csv('4_NOVO_tak.tsv', sep='\t')
+    diff = novoall[~novoall['hash'].isin(novotak['hash'])]
+    diff.to_csv("diff.tsv", sep="\t", index=False)
+    
+    
 
-    core = 0
-    for paper in mais.papers:
-        if paper.data['hash'] in [pap.data['hash'] for pap in igual.papers] \
-         or paper.data.get('DOI', 'FalseA') in [pap.data.get('DOI', 'FalseB') \
-                          for pap in igual.papers if pap.data.get('DOI', 'FalseB') != ''] \
-         or paper.data.get('PMID', 'FalseA') in [pap.data.get('PMID', 'FalseB') \
-                          for pap in igual.papers if pap.data.get('PMID', 'FalseB') != '']:
-            paper.data['info'] = 'core paper'
-            core += 1
-    print('core:', core)
-    mais.export('compara_c_base.tsv')
-'''
-
-'''
-import pandas
-novoall = pandas.DataFrame.from_csv('4_NOVO_all.tsv', sep='\t')
-novotak = pandas.DataFrame.from_csv('4_NOVO_tak.tsv', sep='\t')
-diff = novoall[~novoall['hash'].isin(novotak['hash'])]
-diff.to_csv("diff.tsv", sep="\t")
-'''
+    ### CUIDADO COM NOMES
+    novoall = pd.read_csv('4_NOVO.tsv', sep='\t')
+    diff = pd.read_csv('diff.tsv', sep='\t')
+    diff = diff[['hash', 'info']]
+    diffdict = dict(zip(diff['hash'], diff['info']))
+    for key, value in diffdict.items():
+        novoall.loc[novoall['hash'] == key, 'info'] = value
+    novoall.to_csv("4_NOVO_updated.tsv", sep="\t", index=False)
+    '''
