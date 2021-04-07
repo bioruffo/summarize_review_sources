@@ -203,7 +203,7 @@ def shorten_source(string):
 
 
 def transfer_diff(allrecords, diffrecords, outfile):
-    # Transfer "info" fields from diffrecord to allrecord
+    # Overwrite "info" fields from diffrecord to allrecord
     print("Transferring `info` field from {} to {} and saving as {}".format(
             diffrecords, allrecords, outfile))
     allrecs = pd.read_csv(allrecords, sep='\t')
@@ -214,8 +214,6 @@ def transfer_diff(allrecords, diffrecords, outfile):
         allrecs.loc[allrecs['hash'] == key, 'info'] = value
     allrecs.to_csv(outfile, sep="\t", index=False)
     
-
-
 
 if __name__ == '__main__':
     maindir = 'C:/Users/Roberto/Dropbox/Quarentena/CACD/Review/Searches/'
