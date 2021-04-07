@@ -16,7 +16,7 @@ class Paper:
     def add(self, datadict):
         data = self.convert(datadict)
         for key, value in data.items():
-            if key not in self.data or not self.data[key]:
+            if key not in self.data or not self.data[key].strip():
                 self.data[key] = value
             else:
                 if self.data[key].strip() == '':
@@ -202,12 +202,12 @@ def shorten_source(string):
 
 
 
-def transfer_diff(allrecords, diffrecords, outfile):
-    # Overwrite "info" fields from diffrecord to allrecord
+def transfer_diff(newrecords, oldrecords, outfile='transfer_diff.tsv'):
+    # Write "info" fields from oldrecords to newrecords
     print("Transferring `info` field from {} to {} and saving as {}".format(
-            diffrecords, allrecords, outfile))
-    allrecs = pd.read_csv(allrecords, sep='\t')
-    diff = pd.read_csv(diffrecords, sep='\t')
+            oldrecords, newrecords, outfile))
+    allrecs = pd.read_csv(newrecords, sep='\t')
+    diff = pd.read_csv(oldrecords, sep='\t')
     diff = diff[['hash', 'info']]
     diffdict = dict(zip(diff['hash'], diff['info']))
     for key, value in diffdict.items():
