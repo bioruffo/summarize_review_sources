@@ -8,6 +8,7 @@ import pandas as pd
 import glob
 import re
 import csv
+import html
 
 class Paper:
     def __init__(self, datadict):
@@ -57,10 +58,9 @@ class Paper:
                        'Citation': 'Source' # Pubmed
                        }
         
-        
         # Need to switch from 'Source' to 'Database' in Scopus
         if datadict.get('Source', '').lower() == 'scopus':
-            datadict['Database'] = datadict.pop('Source')
+            datadict.pop('Source')
             
         # Normalize DOI in Lilacs
         if datadict.get('Fulltext URL', False) and not datadict.get('DOI', False):
@@ -76,9 +76,10 @@ class Paper:
         datadict = {key: value_conversions.get(key, lambda x: x)(value) for key, value in datadict.items()}
         if 'First Author' not in datadict.keys():
             datadict['First Author'] = datadict['Authors'].split(',')[0]
-        datadict['hash'] = do_hash(datadict['Authors'], datadict['Title'], datadict['Year'])
-        if 'Database' not in datadict.keys():
-            datadict['Database'] = shorten_source(datadict['database_file'])
+        # 'Database' must be structured because we want to treat them differently
+        datadict['Database'] = shorten_source(datadict['database_file'])
+        datadict['hash'] = do_hash(datadict['Authors'], datadict['Title'], \
+                datadict['Year'], datadict['Database'])
         datadict['info'] = ''
         return datadict
     
@@ -96,6 +97,7 @@ class Papers:
        
             
     def readtab(self, file):
+        global line, paper
         source = re.split('[\\\\/]', file)[-1]
         print("Loading data from", source)
 
@@ -104,7 +106,7 @@ class Papers:
         # encoding for pubmed is 'utf-8-sig', the first 3 chars are the byte order mark 'ï»¿'
         #we need to check if separator is ',' or ';'
         with open(file, 'r', encoding='utf-8-sig') as f:
-            line = f.readline()
+            line = html.unescape(f.readline())
             if ';' in line:
                 sep = ';'
             elif ',' in line:
@@ -113,6 +115,8 @@ class Papers:
                 sep='\t'
         reader = csv.reader(open(file, 'r', encoding='utf-8-sig'), delimiter=sep, quotechar='"')
         for i, line in enumerate(reader):
+            # Lilacs again
+            line = [html.unescape(x) for x in line]
             if i == 0:
                 header = line.copy()
             else:
@@ -176,10 +180,29 @@ def oror(start, end):
     print(" OR ".join("#"+str(x) for x in range(start, end+1)))
 
 
-def do_hash(authors, title, year):
+def do_hash_old(authors, title, year):
     # from `Lastname, FN;` to `Lastname FN,` 
     if ';' in authors:
         authors = authors.replace(',', ' ').replace(';', ',')
+    ausplit = [x.strip() for x in authors.split(',')]
+    aujoin = ''.join(x.strip().split(' ')[0][:3].lower() for x in ausplit)
+    tisplit = re.sub('[^a-z ]', '', title).split(' ') # we set all to lowercase earlier
+    tijoin = ''.join(x.strip()[:3] for x in tisplit)
+    return year+aujoin+tijoin
+
+
+def do_hash(authors, title, year, database):
+    global data
+    data = (authors, title, year, database)
+    # from `Lastname, FN;` to `Lastname FN,` 
+    if database in ['Lilacs', 'WoS']:
+        temp_authors = []
+        for author in authors.split(';'):
+            lastname, firstnames = author.strip().split(',')
+            temp_authors.append(lastname + ' ' + firstnames.replace(' ', ''))
+        authors = ', '.join(temp_authors)
+
+    # Hash
     ausplit = [x.strip() for x in authors.split(',')]
     aujoin = ''.join(x.strip().split(' ')[0][:3].lower() for x in ausplit)
     tisplit = re.sub('[^a-z ]', '', title).split(' ') # we set all to lowercase earlier
@@ -197,6 +220,8 @@ def shorten_source(string):
         return 'Scopus'
     elif 'wos' in strlow or 'web_of_science' in strlow or 'webofscience' in strlow:
         return 'WoS'
+    elif 'lilacs' in strlow:
+        return 'Lilacs'
     else:
         return string
 
@@ -218,7 +243,7 @@ def transfer_diff(newrecords, oldrecords, outfile='transfer_diff.tsv'):
 if __name__ == '__main__':
     maindir = 'C:/Users/Roberto/Dropbox/Quarentena/CACD/Review/Searches/'
     capture = '_PARSE'
-    diffdir = '5_CACD_NOT_else'
+    diffdir = '4_NOVO'
     papers = Papers(glob.glob(maindir+diffdir+'/**/*'+capture+'.csv', recursive=True))
     papers.export(diffdir+'.tsv')
 
