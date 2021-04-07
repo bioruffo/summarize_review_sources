@@ -202,28 +202,27 @@ def shorten_source(string):
 
 
 
+def transfer_diff(allrecords, diffrecord, outfile):
+    # Transfer "info" fields from diffrecord to allrecord
+    print("Transferring `info` fields from {} to {} and saving as {}".format(
+            diffrecord, allrecords, outfile))
+    allrecs = pd.read_csv(allrecords, sep='\t')
+    diff = pd.read_csv(diffrecord, sep='\t')
+    diff = diff[['hash', 'info']]
+    diffdict = dict(zip(diff['hash'], diff['info']))
+    for key, value in diffdict.items():
+        allrecs.loc[allrecs['hash'] == key, 'info'] = value
+    allrecs.to_csv(outfile, sep="\t", index=False)
+    
+
+
+
 if __name__ == '__main__':
     maindir = 'C:/Users/Roberto/Dropbox/Quarentena/CACD/Review/Searches/'
     capture = '_PARSE'
-    diffdir = '4_NOVO'
+    diffdir = '5_CACD_NOT_else'
     papers = Papers(glob.glob(maindir+diffdir+'/**/*'+capture+'.csv', recursive=True))
     papers.export(diffdir+'.tsv')
 
     
-    '''
-    novoall = pd.read_csv('4_NOVO_all.tsv', sep='\t')
-    novotak = pd.read_csv('4_NOVO_tak.tsv', sep='\t')
-    diff = novoall[~novoall['hash'].isin(novotak['hash'])]
-    diff.to_csv("diff.tsv", sep="\t", index=False)
-    
-    
-
-    ### CUIDADO COM NOMES
-    novoall = pd.read_csv('4_NOVO.tsv', sep='\t')
-    diff = pd.read_csv('diff.tsv', sep='\t')
-    diff = diff[['hash', 'info']]
-    diffdict = dict(zip(diff['hash'], diff['info']))
-    for key, value in diffdict.items():
-        novoall.loc[novoall['hash'] == key, 'info'] = value
-    novoall.to_csv("4_NOVO_updated.tsv", sep="\t", index=False)
-    '''
+    transfer_diff('4_NOVO.tsv', '5_CACD_NOT_else.tsv', '4_novo_updated.tsv')
