@@ -97,7 +97,6 @@ class Papers:
        
             
     def readtab(self, file):
-        global line, paper
         source = re.split('[\\\\/]', file)[-1]
         print("Loading data from", source)
 
@@ -192,7 +191,6 @@ def do_hash_old(authors, title, year):
 
 
 def do_hash(authors, title, year, database):
-    global data
     data = (authors, title, year, database)
     # from `Lastname, FN;` to `Lastname FN,` 
     if database in ['Lilacs', 'WoS']:
@@ -227,16 +225,18 @@ def shorten_source(string):
 
 
 
-def transfer_diff(newrecords, oldrecords, outfile='transfer_diff.tsv'):
+def transfer_diff(newrecords, oldrecords, columns=['info'], outfile='transfer_diff.tsv'):
     # Write "info" fields from oldrecords to newrecords
     print("Transferring `info` field from {} to {} and saving as {}".format(
             oldrecords, newrecords, outfile))
-    allrecs = pd.read_csv(newrecords, sep='\t')
-    diff = pd.read_csv(oldrecords, sep='\t')
-    diff = diff[['hash', 'info']]
-    diffdict = dict(zip(diff['hash'], diff['info']))
-    for key, value in diffdict.items():
-        allrecs.loc[allrecs['hash'] == key, 'info'] = value
+    allrecs = pd.read_csv(newrecords, sep='\t', encoding='utf-8')
+    diff = pd.read_csv(oldrecords, sep='\t', encoding='latin1')
+    diff = diff[['hash'] + columns]
+    for column in columns:
+        print("Merging column:", column)
+        diffdict = dict(zip(diff['hash'], diff[column]))
+        for key, value in diffdict.items():
+            allrecs.loc[allrecs['hash'] == key, column] = value
     allrecs.to_csv(outfile, sep="\t", index=False)
     
 
@@ -248,4 +248,7 @@ if __name__ == '__main__':
     papers.export(diffdir+'.tsv')
 
     
-    transfer_diff('4_NOVO.tsv', '5_CACD_NOT_else_mod.tsv', '4_novo_updated.tsv')
+    transfer_diff(newrecords='4_NOVO.tsv', \
+                  oldrecords='4_novo_updated_RECORDS_v02.tsv', \
+                  columns='info	Unique	In topic	In scope	Experimental'.split('\t'), \
+                  outfile='4_novo_updated_RECORDS_v03.tsv')
