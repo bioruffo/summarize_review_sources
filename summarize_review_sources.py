@@ -202,12 +202,12 @@ def shorten_source(string):
 
 
 
-def transfer_diff(allrecords, diffrecord, outfile):
+def transfer_diff(allrecords, diffrecords, outfile):
     # Transfer "info" fields from diffrecord to allrecord
-    print("Transferring `info` fields from {} to {} and saving as {}".format(
-            diffrecord, allrecords, outfile))
+    print("Transferring `info` field from {} to {} and saving as {}".format(
+            diffrecords, allrecords, outfile))
     allrecs = pd.read_csv(allrecords, sep='\t')
-    diff = pd.read_csv(diffrecord, sep='\t')
+    diff = pd.read_csv(diffrecords, sep='\t')
     diff = diff[['hash', 'info']]
     diffdict = dict(zip(diff['hash'], diff['info']))
     for key, value in diffdict.items():
@@ -225,4 +225,4 @@ if __name__ == '__main__':
     papers.export(diffdir+'.tsv')
 
     
-    transfer_diff('4_NOVO.tsv', '5_CACD_NOT_else.tsv', '4_novo_updated.tsv')
+    transfer_diff('4_NOVO.tsv', '5_CACD_NOT_else_mod.tsv', '4_novo_updated.tsv')
