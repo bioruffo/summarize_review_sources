@@ -70,7 +70,9 @@ class Paper:
 
         value_conversions = {'Authors': lambda x: x.replace('.', ''),
                              'Title': lambda x:x.lower(),
-                             'DOI': lambda x:x.lower()}
+                             'DOI': lambda x:x.lower(),
+                             # Removing Scopus abstracts with no data
+                             'Abstract': lambda x:[x, ''][x == '[No abstract available]']}
 
         datadict = {key_conversions.get(item, item): datadict[item] for item in datadict}
         datadict = {key: value_conversions.get(key, lambda x: x)(value) for key, value in datadict.items()}
@@ -191,7 +193,6 @@ def do_hash_old(authors, title, year):
 
 
 def do_hash(authors, title, year, database):
-    data = (authors, title, year, database)
     # from `Lastname, FN;` to `Lastname FN,` 
     if database in ['Lilacs', 'WoS']:
         temp_authors = []
